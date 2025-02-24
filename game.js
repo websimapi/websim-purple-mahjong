@@ -218,18 +218,20 @@ class MahjongGame {
   }
 
   handleTileClick(tile) {
-    // Block clicks if we're already processing a match check.
     if (this.isProcessing) return;
     if (tile.isMatched || !tile.isFree(this.board)) return;
     
-    const element = tile.element;
+    // Allow deselecting a tile if already selected
     if (this.selectedTiles.includes(tile)) {
-      element.classList.remove('selected');
+      tile.element.classList.remove('selected');
       this.selectedTiles = this.selectedTiles.filter(t => t !== tile);
       return;
     }
 
-    element.classList.add('selected');
+    // Prevent selecting more than two tiles at a time
+    if (this.selectedTiles.length >= 2) return;
+
+    tile.element.classList.add('selected');
     this.selectedTiles.push(tile);
 
     if (this.selectedTiles.length === 2) {
