@@ -1,38 +1,88 @@
 const GAME_DURATION = 120; // seconds
-const TILES_COUNT = 32;
+const BOARD_LAYERS = 4;
+const LAYER_SIZE = { width: 8, height: 6 };
+const TILE_TYPES = {
+  DOTS: 'p',
+  BAMBOO: 's',
+  CHARACTERS: 'm',
+  WINDS: 'wind',
+  DRAGONS: 'dragon'
+};
 
-class MahjongGame {
+class MahjongTile {
+  constructor(symbol, x, y, z) {
+    this.symbol = symbol;
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.element = null;
+    this.isMatched = false;
+  }
+
+  isFree(board) {
+    // A tile is free if it has no tile above it and at least one side exposed
+    const hasAbove = board.tiles.some(t => 
+      t.x === this.x && t.y === this.y && t.z === this.z + 1 && !t.isMatched
+    );
+    
+    if (hasAbove) return false;
+
+    // Check if either left or right side is exposed
+    const hasLeft = board.tiles.some(t => 
+      t.x === this.x - 1 && t.y === this.y && t.z === this.z && !t.isMatched
+    );
+    const hasRight = board.tiles.some(t => 
+      t.x === this.x + 1 && t.y === this.y && t.z === this.z && !t.isMatched
+    );
+
+    return !hasLeft || !hasRight;
+  }
+}
+
+class MahjongBoard {
   constructor() {
-    this.board = document.getElementById('board');
-    this.scoreElement = document.getElementById('score-value');
-    this.timeElement = document.getElementById('time-value');
-    this.selectedTiles = [];
-    this.score = 0;
-    this.timeLeft = GAME_DURATION;
-    this.symbols = this.generateSymbols();
-    this.initGame();
+    this.tiles = [];
+    this.generateBoard();
+  }
+
+  generateBoard() {
+    const symbols = this.generateSymbols();
+    let symbolIndex = 0;
+
+    // Create layered board structure
+    for (let z = 0; z < BOARD_LAYERS; z++) {
+      const layerWidth = LAYER_SIZE.width - z;
+      const layerHeight = LAYER_SIZE.height - z;
+      
+      for (let y = z; y < layerHeight; y++) {
+        for (let x = z; x < layerWidth; x++) {
+          if (symbolIndex < symbols.length) {
+            this.tiles.push(new MahjongTile(symbols[symbolIndex], x, y, z));
+            symbolIndex++;
+          }
+        }
+      }
+    }
   }
 
   generateSymbols() {
-    const basicSymbols = [
-      'm-1', 'm-2', 'm-3', 'm-4', 'm-5', 'm-6', 'm-7', 'm-8', 'm-9',
-      'p-1', 'p-2', 'p-3', 'p-4', 'p-5', 'p-6', 'p-7', 'p-8', 'p-9',
-      's-1', 's-2', 's-3', 's-4', 's-5', 's-6', 's-7', 's-8', 's-9',
-      'wind-n', 'wind-s', 'wind-e', 'wind-w',
-      'dragon-white', 'dragon-green', 'dragon-red'
-    ];
-    
-    // Select 16 random symbols (we need pairs, so total 32 tiles)
-    const selectedSymbols = [];
-    while (selectedSymbols.length < TILES_COUNT / 2) {
-      const symbol = basicSymbols[Math.floor(Math.random() * basicSymbols.length)];
-      if (!selectedSymbols.includes(symbol)) {
-        selectedSymbols.push(symbol);
+    const basicSymbols = [];
+    // Generate tiles for each suit (dots, bamboo, characters)
+    ['p', 's', 'm'].forEach(suit => {
+      for (let i = 1; i <= 9; i++) {
+        basicSymbols.push(`${suit}-${i}`);
       }
-    }
+    });
     
-    // Double the symbols and shuffle
-    return this.shuffle([...selectedSymbols, ...selectedSymbols]);
+    // Add winds and dragons
+    const winds = ['n', 's', 'e', 'w'].map(w => `wind-${w}`);
+    const dragons = ['white', 'green', 'red'].map(d => `dragon-${d}`);
+    
+    const allSymbols = [...basicSymbols, ...winds, ...dragons];
+    
+    // Create pairs
+    const pairs = [...allSymbols, ...allSymbols];
+    return this.shuffle(pairs);
   }
 
   shuffle(array) {
@@ -42,17 +92,62 @@ class MahjongGame {
     }
     return array;
   }
+}
 
-  createTile(symbol) {
-    const tile = document.createElement('div');
-    tile.className = 'tile';
-    tile.dataset.symbol = symbol;
+class MahjongGame {
+  constructor() {
+    this.board = null;
+    this.selectedTiles = [];
+    this.score = 0;
+    this.timeLeft = GAME_DURATION;
+    this.boardElement = document.getElementById('board');
+    this.scoreElement = document.getElementById('score-value');
+    this.timeElement = document.getElementById('time-value');
+    this.initGame();
+  }
+
+  initGame() {
+    this.boardElement.innerHTML = '';
+    this.score = 0;
+    this.timeLeft = GAME_DURATION;
+    this.scoreElement.textContent = this.score;
+    this.timeElement.textContent = this.timeLeft;
+    this.board = new MahjongBoard();
+    this.renderBoard();
+
+    if (this.timer) clearInterval(this.timer);
+    this.timer = setInterval(() => this.updateTimer(), 1000);
+  }
+
+  renderBoard() {
+    this.board.tiles.forEach(tile => {
+      const element = this.createTileElement(tile);
+      tile.element = element;
+      this.boardElement.appendChild(element);
+    });
+    this.updateTileStates();
+  }
+
+  createTileElement(tile) {
+    const element = document.createElement('div');
+    element.className = 'tile';
+    element.innerHTML = this.createSymbolSVG(tile.symbol);
     
-    const svg = this.createSymbolSVG(symbol);
-    tile.innerHTML = svg;
+    // Position tile in 3D space
+    const tileWidth = 62; // Slightly larger than CSS width for spacing
+    const tileHeight = 82;
+    const tileDepth = 20;
     
-    tile.addEventListener('click', () => this.handleTileClick(tile));
-    return tile;
+    element.style.transform = `
+      translate3d(
+        ${tile.x * tileWidth}px,
+        ${tile.y * tileHeight}px,
+        ${tile.z * tileDepth}px
+      )
+    `;
+    
+    element.addEventListener('click', () => this.handleTileClick(tile));
+    return element;
   }
 
   createSymbolSVG(symbol) {
@@ -87,12 +182,26 @@ class MahjongGame {
     }
   }
 
+  updateTileStates() {
+    this.board.tiles.forEach(tile => {
+      if (!tile.isMatched) {
+        const isFree = tile.isFree(this.board);
+        tile.element.classList.toggle('disabled', !isFree);
+      }
+    });
+  }
+
   handleTileClick(tile) {
-    if (tile.classList.contains('matched') || tile.classList.contains('selected')) {
+    if (tile.isMatched || !tile.isFree(this.board)) return;
+    
+    const element = tile.element;
+    if (this.selectedTiles.includes(tile)) {
+      element.classList.remove('selected');
+      this.selectedTiles = this.selectedTiles.filter(t => t !== tile);
       return;
     }
 
-    tile.classList.add('selected');
+    element.classList.add('selected');
     this.selectedTiles.push(tile);
 
     if (this.selectedTiles.length === 2) {
@@ -102,30 +211,53 @@ class MahjongGame {
 
   checkMatch() {
     const [tile1, tile2] = this.selectedTiles;
-    const match = tile1.dataset.symbol === tile2.dataset.symbol;
+    const match = tile1.symbol === tile2.symbol;
 
     if (match) {
+      this.handleMatch(tile1, tile2);
+    } else {
       setTimeout(() => {
-        tile1.classList.add('matched');
-        tile2.classList.add('matched');
-        this.score += 100;
-        this.scoreElement.textContent = this.score;
-        this.checkWin();
-      }, 500);
+        tile1.element.classList.remove('selected');
+        tile2.element.classList.remove('selected');
+        this.selectedTiles = [];
+      }, 1000);
     }
+  }
 
+  handleMatch(tile1, tile2) {
+    const points = 100 + (tile1.z * 50); // More points for higher layers
+    this.score += points;
+    this.scoreElement.textContent = this.score;
+    
+    // Show floating score
+    const popup = document.createElement('div');
+    popup.className = 'score-popup';
+    popup.textContent = `+${points}`;
+    popup.style.left = `${tile1.element.offsetLeft}px`;
+    popup.style.top = `${tile1.element.offsetTop}px`;
+    this.boardElement.appendChild(popup);
+    
+    setTimeout(() => popup.remove(), 1000);
+
+    // Mark tiles as matched
+    tile1.isMatched = tile2.isMatched = true;
+    
     setTimeout(() => {
-      tile1.classList.remove('selected');
-      tile2.classList.remove('selected');
+      tile1.element.classList.add('matched');
+      tile2.element.classList.add('matched');
       this.selectedTiles = [];
-    }, 1000);
+      this.updateTileStates();
+      this.checkWin();
+    }, 500);
   }
 
   checkWin() {
-    const matchedTiles = document.querySelectorAll('.matched').length;
-    if (matchedTiles === TILES_COUNT) {
-      alert(`Congratulations! You won with score ${this.score}!`);
-      this.initGame();
+    if (this.board.tiles.every(tile => tile.isMatched)) {
+      clearInterval(this.timer);
+      setTimeout(() => {
+        alert(`Congratulations! You won with score ${this.score}!`);
+        this.initGame();
+      }, 500);
     }
   }
 
@@ -134,27 +266,10 @@ class MahjongGame {
     this.timeElement.textContent = this.timeLeft;
     
     if (this.timeLeft <= 0) {
+      clearInterval(this.timer);
       alert(`Time's up! Your score: ${this.score}`);
       this.initGame();
     }
-  }
-
-  initGame() {
-    this.board.innerHTML = '';
-    this.score = 0;
-    this.timeLeft = GAME_DURATION;
-    this.scoreElement.textContent = this.score;
-    this.timeElement.textContent = this.timeLeft;
-    this.symbols = this.generateSymbols();
-    
-    this.symbols.forEach(symbol => {
-      this.board.appendChild(this.createTile(symbol));
-    });
-
-    if (this.timer) {
-      clearInterval(this.timer);
-    }
-    this.timer = setInterval(() => this.updateTimer(), 1000);
   }
 }
 

@@ -6,53 +6,72 @@ body {
   align-items: center;
   background: linear-gradient(135deg, #2a0845 0%, #6441A5 100%);
   font-family: Arial, sans-serif;
+  touch-action: manipulation;
 }
 
 #game-container {
   position: relative;
   padding: 20px;
+  width: 100%;
+  max-width: 1200px;
+}
+
+#stats {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+#board-container {
+  position: relative;
+  width: 100%;
+  height: 80vh;
+  perspective: 1000px;
+  overflow: hidden;
 }
 
 #board {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 4px;
-  background: rgba(255, 255, 255, 0.1);
-  padding: 10px;
-  border-radius: 10px;
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transform: rotateX(45deg) rotateZ(45deg);
 }
 
 .tile {
-  width: 60px;
-  height: 80px;
+  position: absolute;
+  width: calc(min(60px, 12vw));
+  height: calc(min(80px, 16vw));
   background: linear-gradient(145deg, #9d65d0, #7b4eb3);
   border-radius: 8px;
   cursor: pointer;
-  position: relative;
-  transition: transform 0.3s ease;
+  transform-style: preserve-3d;
+  transition: transform 0.3s ease, opacity 0.5s ease;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
-.tile:hover {
-  transform: translateY(-2px);
+.tile.disabled {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.tile:not(.disabled):hover {
+  transform: translateY(-2px) translateZ(2px);
 }
 
 .tile.selected {
-  transform: scale(0.95);
+  transform: scale(0.95) translateZ(4px);
   box-shadow: 0 0 10px #fff;
 }
 
 .tile.matched {
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.5s ease;
 }
 
 #score, #timer {
   color: white;
-  font-size: 24px;
-  margin-bottom: 20px;
+  font-size: min(24px, 5vw);
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
 }
 
@@ -61,6 +80,7 @@ body {
   height: 100%;
   padding: 10px;
   box-sizing: border-box;
+  transform: translateZ(1px);
 }
 
 .tile .face {
@@ -68,7 +88,8 @@ body {
   transition: opacity 0.3s ease;
 }
 
-.tile.selected .face {
+.tile.selected .face,
+.tile:hover .face {
   opacity: 1;
 }
 
@@ -76,12 +97,42 @@ body {
   opacity: 0;
 }
 
-@keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
+@media (max-width: 768px) {
+  #board {
+    transform: rotateX(35deg) rotateZ(35deg);
+  }
+  
+  #game-container {
+    padding: 10px;
+  }
 }
 
-.tile.pulse {
-  animation: pulse 0.3s ease;
+@keyframes floatIn {
+  from {
+    opacity: 0;
+    transform: translateZ(-100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateZ(0);
+  }
+}
+
+.score-popup {
+  position: absolute;
+  color: #fff;
+  font-size: 24px;
+  pointer-events: none;
+  animation: floatUp 1s ease-out forwards;
+}
+
+@keyframes floatUp {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-50px);
+  }
 }
