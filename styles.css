@@ -28,6 +28,7 @@ body {
   height: 80vh;
   perspective: 1000px;
   overflow: hidden;
+  touch-action: none; /* Prevent default gestures to enable custom pan and zoom */
 }
 
 #board {

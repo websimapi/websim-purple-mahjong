@@ -24,14 +24,13 @@ class MahjongTile {
     const hasAbove = board.tiles.some(t => 
       t.x === this.x && t.y === this.y && t.z === this.z + 1 && !t.isMatched
     );
-    
     if (hasAbove) return false;
 
     // Check if either left or right side is exposed
-    const hasLeft = board.tiles.some(t => 
+    const hasLeft = board.tiles.some(t =>
       t.x === this.x - 1 && t.y === this.y && t.z === this.z && !t.isMatched
     );
-    const hasRight = board.tiles.some(t => 
+    const hasRight = board.tiles.some(t =>
       t.x === this.x + 1 && t.y === this.y && t.z === this.z && !t.isMatched
     );
 
@@ -73,13 +72,15 @@ class MahjongBoard {
         basicSymbols.push(`${suit}-${i}`);
       }
     });
-    
+
     // Add winds and dragons
     const winds = ['n', 's', 'e', 'w'].map(w => `wind-${w}`);
     const dragons = ['white', 'green', 'red'].map(d => `dragon-${d}`);
-    
-    const allSymbols = [...basicSymbols, ...winds, ...dragons];
-    
+    // Add additional unique symbols: flowers and seasons
+    const flowers = ['plum', 'orchid', 'bamboo', 'chrysanthemum'].map(f => `flower-${f}`);
+    const seasons = ['spring', 'summer', 'autumn', 'winter'].map(s => `season-${s}`);
+
+    const allSymbols = [...basicSymbols, ...winds, ...dragons, ...flowers, ...seasons];
     // Create pairs
     const pairs = [...allSymbols, ...allSymbols];
     return this.shuffle(pairs);
@@ -105,6 +106,7 @@ class MahjongGame {
     this.timeElement = document.getElementById('time-value');
     this.isProcessing = false; // Prevent further tile clicks while checking matches
     this.initGame();
+    this.initPanZoom();
   }
 
   initGame() {
@@ -154,7 +156,6 @@ class MahjongGame {
   createSymbolSVG(symbol) {
     const [type, value] = symbol.split('-');
     let color = '#fff';
-    
     switch(type) {
       case 'm': // Character tiles
         return `<svg class="face" viewBox="0 0 100 100">
@@ -169,21 +170,47 @@ class MahjongGame {
           <rect x="45" y="20" width="10" height="${60 - parseInt(value) * 3}" fill="${color}"/>
         </svg>`;
       case 'wind':
-        const winds = {n: '北', s: '南', e: '東', w: '西'};
+        const winds = { n: '北', s: '南', e: '東', w: '西' };
         return `<svg class="face" viewBox="0 0 100 100">
           <text x="50" y="50" fill="${color}" text-anchor="middle" dominant-baseline="middle" font-size="40">${winds[value]}</text>
         </svg>`;
       case 'dragon':
-        const dragons = {white: '白', green: '發', red: '中'};
+        const dragons = { white: '白', green: '發', red: '中' };
         return `<svg class="face" viewBox="0 0 100 100">
           <text x="50" y="50" fill="${color}" text-anchor="middle" dominant-baseline="middle" font-size="40">${dragons[value]}</text>
+        </svg>`;
+      case 'flower':
+        const flowerColors = {
+          plum: 'purple',
+          orchid: 'blue',
+          bamboo: 'green',
+          chrysanthemum: 'orange'
+        };
+        let fill = flowerColors[value] || 'pink';
+        return `<svg class="face" viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="10" fill="yellow"/>
+          <circle cx="30" cy="30" r="10" fill="${fill}"/>
+          <circle cx="70" cy="30" r="10" fill="${fill}"/>
+          <circle cx="30" cy="70" r="10" fill="${fill}"/>
+          <circle cx="70" cy="70" r="10" fill="${fill}"/>
+        </svg>`;
+      case 'season':
+        const seasonSymbols = {
+          spring: 'S',
+          summer: 'Su',
+          autumn: 'A',
+          winter: 'W'
+        };
+        let display = seasonSymbols[value] || value;
+        return `<svg class="face" viewBox="0 0 100 100">
+          <text x="50" y="50" fill="${color}" text-anchor="middle" dominant-baseline="middle" font-size="40">${display}</text>
         </svg>`;
     }
   }
 
   updateTileStates() {
     this.board.tiles.forEach(tile => {
-      if (!tile.isMatched) {
+      if (!tile.isMatched && tile.element) {
         const isFree = tile.isFree(this.board);
         tile.element.classList.toggle('disabled', !isFree);
       }
@@ -232,7 +259,7 @@ class MahjongGame {
     this.score += points;
     this.scoreElement.textContent = this.score;
     
-    // Show floating score
+    // Show floating score popup
     const popup = document.createElement('div');
     popup.className = 'score-popup';
     popup.textContent = `+${points}`;
@@ -248,10 +275,15 @@ class MahjongGame {
     setTimeout(() => {
       tile1.element.classList.add('matched');
       tile2.element.classList.add('matched');
-      this.selectedTiles = [];
-      this.updateTileStates();
-      this.checkWin();
-      this.isProcessing = false;
+      // Remove the tile elements completely after the fade-out animation
+      setTimeout(() => {
+        if (tile1.element && tile1.element.parentNode) tile1.element.parentNode.removeChild(tile1.element);
+        if (tile2.element && tile2.element.parentNode) tile2.element.parentNode.removeChild(tile2.element);
+        this.selectedTiles = [];
+        this.updateTileStates();
+        this.checkWin();
+        this.isProcessing = false;
+      }, 500);
     }, 500);
   }
 
@@ -274,6 +306,104 @@ class MahjongGame {
       alert(`Time's up! Your score: ${this.score}`);
       this.initGame();
     }
+  }
+
+  initPanZoom() {
+    const container = document.getElementById('board-container');
+    const boardEl = document.getElementById('board');
+    const initialRotation = 'rotateX(45deg) rotateZ(45deg)';
+    const panZoom = {
+      panX: 0,
+      panY: 0,
+      scale: 1,
+      isPanning: false,
+      isZooming: false,
+      startTouches: [],
+      startPan: { x: 0, y: 0 },
+      startDistance: 0,
+      initialScale: 1
+    };
+
+    const updateBoardTransform = () => {
+      boardEl.style.transform = `translate(${panZoom.panX}px, ${panZoom.panY}px) scale(${panZoom.scale}) ${initialRotation}`;
+    };
+
+    container.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) {
+        panZoom.isPanning = true;
+        panZoom.startTouches = [{ x: e.touches[0].clientX, y: e.touches[0].clientY }];
+        panZoom.startPan = { x: panZoom.panX, y: panZoom.panY };
+      } else if (e.touches.length === 2) {
+        panZoom.isZooming = true;
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
+        panZoom.startDistance = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
+        panZoom.initialScale = panZoom.scale;
+      }
+    }, { passive: false });
+
+    container.addEventListener('touchmove', (e) => {
+      if (panZoom.isPanning && e.touches.length === 1) {
+        const dx = e.touches[0].clientX - panZoom.startTouches[0].x;
+        const dy = e.touches[0].clientY - panZoom.startTouches[0].y;
+        panZoom.panX = panZoom.startPan.x + dx;
+        panZoom.panY = panZoom.startPan.y + dy;
+        updateBoardTransform();
+      } else if (panZoom.isZooming && e.touches.length === 2) {
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
+        const currentDistance = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
+        panZoom.scale = panZoom.initialScale * (currentDistance / panZoom.startDistance);
+        if (panZoom.scale < 0.5) panZoom.scale = 0.5;
+        if (panZoom.scale > 3) panZoom.scale = 3;
+        updateBoardTransform();
+      }
+      e.preventDefault();
+    }, { passive: false });
+
+    container.addEventListener('touchend', (e) => {
+      if (e.touches.length < 2) {
+        panZoom.isZooming = false;
+      }
+      if (e.touches.length === 0) {
+        panZoom.isPanning = false;
+      }
+    });
+
+    // Mouse events for desktop panning
+    container.addEventListener('mousedown', (e) => {
+      panZoom.isPanning = true;
+      panZoom.startTouches = [{ x: e.clientX, y: e.clientY }];
+      panZoom.startPan = { x: panZoom.panX, y: panZoom.panY };
+    });
+
+    container.addEventListener('mousemove', (e) => {
+      if (panZoom.isPanning) {
+        const dx = e.clientX - panZoom.startTouches[0].x;
+        const dy = e.clientY - panZoom.startTouches[0].y;
+        panZoom.panX = panZoom.startPan.x + dx;
+        panZoom.panY = panZoom.startPan.y + dy;
+        updateBoardTransform();
+      }
+    });
+
+    container.addEventListener('mouseup', () => {
+      panZoom.isPanning = false;
+    });
+
+    container.addEventListener('mouseleave', () => {
+      panZoom.isPanning = false;
+    });
+
+    // Wheel zoom for desktop
+    container.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      let zoomFactor = 1 - e.deltaY / 500;
+      panZoom.scale *= zoomFactor;
+      if (panZoom.scale < 0.5) panZoom.scale = 0.5;
+      if (panZoom.scale > 3) panZoom.scale = 3;
+      updateBoardTransform();
+    });
   }
 }
 
