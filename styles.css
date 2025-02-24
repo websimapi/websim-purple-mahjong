@@ -97,16 +97,6 @@ body {
   opacity: 0;
 }
 
-@media (max-width: 768px) {
-  #board {
-    transform: rotateX(35deg) rotateZ(35deg);
-  }
-  
-  #game-container {
-    padding: 10px;
-  }
-}
-
 @keyframes floatIn {
   from {
     opacity: 0;
@@ -134,5 +124,21 @@ body {
   100% {
     opacity: 0;
     transform: translateY(-50px);
+  }
+}
+
+@media (max-width: 768px) {
+  #board {
+    transform: rotateX(35deg) rotateZ(35deg);
+  }
+  
+  #game-container {
+    padding: 10px;
+    height: 100vh;
+    box-sizing: border-box;
+  }
+  
+  #board-container {
+    height: calc(100vh - 60px);
   }
 }

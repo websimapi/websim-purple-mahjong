@@ -103,6 +103,7 @@ class MahjongGame {
     this.boardElement = document.getElementById('board');
     this.scoreElement = document.getElementById('score-value');
     this.timeElement = document.getElementById('time-value');
+    this.isProcessing = false; // Prevent further tile clicks while checking matches
     this.initGame();
   }
 
@@ -153,9 +154,7 @@ class MahjongGame {
   createSymbolSVG(symbol) {
     const [type, value] = symbol.split('-');
     let color = '#fff';
-    let path = '';
     
-    // Generate SVG path based on tile type and value
     switch(type) {
       case 'm': // Character tiles
         return `<svg class="face" viewBox="0 0 100 100">
@@ -192,6 +191,8 @@ class MahjongGame {
   }
 
   handleTileClick(tile) {
+    // Block clicks if we're already processing a match check.
+    if (this.isProcessing) return;
     if (tile.isMatched || !tile.isFree(this.board)) return;
     
     const element = tile.element;
@@ -210,6 +211,7 @@ class MahjongGame {
   }
 
   checkMatch() {
+    this.isProcessing = true;
     const [tile1, tile2] = this.selectedTiles;
     const match = tile1.symbol === tile2.symbol;
 
@@ -220,6 +222,7 @@ class MahjongGame {
         tile1.element.classList.remove('selected');
         tile2.element.classList.remove('selected');
         this.selectedTiles = [];
+        this.isProcessing = false;
       }, 1000);
     }
   }
@@ -248,6 +251,7 @@ class MahjongGame {
       this.selectedTiles = [];
       this.updateTileStates();
       this.checkWin();
+      this.isProcessing = false;
     }, 500);
   }
 
