@@ -1,0 +1,87 @@
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #2a0845 0%, #6441A5 100%);
+  font-family: Arial, sans-serif;
+}
+
+#game-container {
+  position: relative;
+  padding: 20px;
+}
+
+#board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 10px;
+  border-radius: 10px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+}
+
+.tile {
+  width: 60px;
+  height: 80px;
+  background: linear-gradient(145deg, #9d65d0, #7b4eb3);
+  border-radius: 8px;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.3s ease;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.tile:hover {
+  transform: translateY(-2px);
+}
+
+.tile.selected {
+  transform: scale(0.95);
+  box-shadow: 0 0 10px #fff;
+}
+
+.tile.matched {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+
+#score, #timer {
+  color: white;
+  font-size: 24px;
+  margin-bottom: 20px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.tile svg {
+  width: 100%;
+  height: 100%;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+.tile .face {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.tile.selected .face {
+  opacity: 1;
+}
+
+.tile.matched .face {
+  opacity: 0;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.tile.pulse {
+  animation: pulse 0.3s ease;
+}
