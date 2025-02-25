@@ -155,35 +155,32 @@ class MahjongGame {
   }
 
   createSymbolSVG(symbol) {
-    // Instead of drawing detailed SVGs, we now use emojis for a unique look.
-    // Define emoji maps for each suit.
     const emojis = {
-      m: ["🀇", "🀈", "🀉", "🀊", "🀋", "🀌", "🀍", "🀎", "🀏"], // Characters (萬)
-      p: ["🀙", "🀚", "🀛", "🀜", "🀝", "🀞", "🀟", "🀠", "🀡"], // Dots (筒)
-      s: ["🀐", "🀑", "🀒", "🀓", "🀔", "🀕", "🀖", "🀗", "🀘"]  // Bamboo (索)
+      m: ["😀", "😃", "😄", "😁", "😆", "😅", "😂", "🙂", "😉"],
+      p: ["🍎", "🍊", "🍋", "🍌", "🍉", "🍇", "🍓", "🍒", "🥝"],
+      s: ["🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨"]
     };
 
-    // For winds, dragons, flowers, and seasons, map the value to an emoji.
     const windEmojis = { 
-      n: "🀃",  // North
-      s: "🀁",  // South
-      e: "🀀",  // East 
-      w: "🀂"   // West
+      n: "⬆️",
+      s: "⬇️",
+      e: "➡️",
+      w: "⬅️"
     };
     const dragonEmojis = {
-      red: "🀄", 
-      green: "🀅", 
-      white: "🀆"
+      red: "🐉", 
+      green: "🐲", 
+      white: "⚪"
     };
     const flowerEmojis = {
       plum: "🌸",
-      orchid: "🌺",
-      bamboo: "🎋",
+      orchid: "🌹",
+      bamboo: "🌺",
       chrysanthemum: "🌼"
     };
     const seasonEmojis = {
       spring: "🌱",
-      summer: "☀️",
+      summer: "🌞",
       autumn: "🍂",
       winter: "❄️"
     };
@@ -229,7 +226,6 @@ class MahjongGame {
         break;
       }
     }
-    // Return an SVG container that simply displays the emoji centered.
     return `<svg class="face" viewBox="0 0 100 100">
               <text x="50" y="50" text-anchor="middle" dominant-baseline="middle" font-size="60">
                 ${emoji}
