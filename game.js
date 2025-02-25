@@ -135,6 +135,7 @@ class MahjongGame {
     const element = document.createElement('div');
     element.className = 'tile';
     element.innerHTML = this.createSymbolSVG(tile.symbol);
+    element.style.zIndex = tile.z * 10;  // Ensure higher-layer tiles appear on top
     
     // Position tile in 3D space
     const tileWidth = 62; // Slightly larger than CSS width for spacing
@@ -213,13 +214,24 @@ class MahjongGame {
       if (!tile.isMatched && tile.element) {
         const isFree = tile.isFree(this.board);
         tile.element.classList.toggle('disabled', !isFree);
+        tile.element.classList.toggle('free', isFree);  // Mark free tiles visually
       }
     });
   }
 
   handleTileClick(tile) {
-    if (this.isProcessing) return;
-    if (tile.isMatched || !tile.isFree(this.board)) return;
+    if (tile.isMatched) return;
+    if (!tile.isFree(this.board)) {
+      // If tile is not free, highlight the blocking (upper) tile to show what's on top
+      const blockingTile = this.board.tiles.find(t => 
+        t.x === tile.x && t.y === tile.y && t.z === tile.z + 1 && !t.isMatched
+      );
+      if (blockingTile && blockingTile.element) {
+        blockingTile.element.classList.add('highlight');
+        setTimeout(() => blockingTile.element.classList.remove('highlight'), 500);
+      }
+      return;
+    }
     
     // Allow deselecting a tile if already selected
     if (this.selectedTiles.includes(tile)) {
@@ -227,13 +239,13 @@ class MahjongGame {
       this.selectedTiles = this.selectedTiles.filter(t => t !== tile);
       return;
     }
-
+    
     // Prevent selecting more than two tiles at a time
     if (this.selectedTiles.length >= 2) return;
-
+    
     tile.element.classList.add('selected');
     this.selectedTiles.push(tile);
-
+    
     if (this.selectedTiles.length === 2) {
       this.checkMatch();
     }
