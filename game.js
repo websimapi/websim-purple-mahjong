@@ -158,13 +158,31 @@ class MahjongGame {
     const [type, value] = symbol.split('-');
     let color = '#fff';
     switch(type) {
-      case 'm': // Character tiles
+      case 'm': 
         return `<svg class="face" viewBox="0 0 100 100">
-          <text x="50" y="50" fill="${color}" text-anchor="middle" dominant-baseline="middle" font-size="40">${value}</text>
-        </svg>`;
-      case 'p': // Circle tiles - updated unique design
+                  <defs>
+                     <linearGradient id="grad-${value}" x1="0%" y1="0%" x2="100%" y2="100%">
+                       <stop offset="0%" style="stop-color:#ff9a9e;stop-opacity:1" />
+                       <stop offset="100%" style="stop-color:#fad0c4;stop-opacity:1" />
+                     </linearGradient>
+                  </defs>
+                  <text x="50" y="55" fill="url(#grad-${value})" text-anchor="middle" dominant-baseline="middle" font-size="40" font-family="Georgia, serif">${value}</text>
+                </svg>`;
+      case 'p':
         {
           const number = parseInt(value);
+          const colors = {
+            1: "#FF6F61",
+            2: "#6B5B95",
+            3: "#88B04B",
+            4: "#F7CAC9",
+            5: "#92A8D1",
+            6: "#955251",
+            7: "#B565A7",
+            8: "#009B77",
+            9: "#DD4124"
+          };
+          const fillColor = colors[number] || color;
           const circlePositions = {
             1: [{ cx: 50, cy: 50 }],
             2: [{ cx: 30, cy: 30 }, { cx: 70, cy: 70 }],
@@ -178,52 +196,110 @@ class MahjongGame {
           };
           const positions = circlePositions[number] || [];
           let svgContent = `<svg class="face" viewBox="0 0 100 100">`;
+          svgContent += `<rect width="100" height="100" fill="none" stroke="${fillColor}" stroke-width="2"/>`;
           positions.forEach(pos => {
-            svgContent += `<circle cx="${pos.cx}" cy="${pos.cy}" r="8" fill="${color}" />`;
+            svgContent += `<circle cx="${pos.cx}" cy="${pos.cy}" r="8" fill="${fillColor}" stroke="black" stroke-width="1"/>`;
           });
+          svgContent += `<circle cx="50" cy="50" r="${number}" fill="none" stroke="${fillColor}" stroke-dasharray="4" stroke-width="1"/>`;
           svgContent += `</svg>`;
           return svgContent;
         }
-      case 's': // Bamboo tiles
+      case 's': 
+        {
+          return `<svg class="face" viewBox="0 0 100 100">
+                    <defs>
+                      <linearGradient id="bamboo-grad-${value}" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" style="stop-color:#76b852;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#8DC26F;stop-opacity:1" />
+                      </linearGradient>
+                    </defs>
+                    <rect x="40" y="10" width="20" height="80" fill="url(#bamboo-grad-${value})"/>
+                    <path d="M40 20 H60" stroke="white" stroke-width="2"/>
+                    <path d="M40 40 H60" stroke="white" stroke-width="2"/>
+                    <path d="M40 60 H60" stroke="white" stroke-width="2"/>
+                    <path d="M40 80 H60" stroke="white" stroke-width="2"/>
+                  </svg>`;
+        }
+      case 'wind': 
+        {
+          const winds = { n: '北', s: '南', e: '東', w: '西' };
+          return `<svg class="face" viewBox="0 0 100 100">
+                    <defs>
+                      <radialGradient id="wind-grad-${value}" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" style="stop-color:#89f7fe;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#66a6ff;stop-opacity:1" />
+                      </radialGradient>
+                    </defs>
+                    <circle cx="50" cy="50" r="45" fill="url(#wind-grad-${value})" />
+                    <text x="50" y="55" fill="#fff" text-anchor="middle" dominant-baseline="middle" font-size="40">${winds[value]}</text>
+                  </svg>`;
+        }
+      case 'dragon': 
+        {
+          const dragons = { white: '白', green: '發', red: '中' };
+          let gradColor = '';
+          if (value === 'white') {
+            gradColor = '#f0f0f0';
+          } else if (value === 'green') {
+            gradColor = '#76b852';
+          } else if (value === 'red') {
+            gradColor = '#ff6f61';
+          }
+          return `<svg class="face" viewBox="0 0 100 100">
+                    <defs>
+                      <radialGradient id="dragon-grad-${value}" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" style="stop-color:${gradColor};stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#000;stop-opacity:1" />
+                      </radialGradient>
+                    </defs>
+                    <rect x="10" y="10" width="80" height="80" rx="15" ry="15" fill="url(#dragon-grad-${value})"/>
+                    <text x="50" y="55" fill="#fff" text-anchor="middle" dominant-baseline="middle" font-size="40">${dragons[value]}</text>
+                  </svg>`;
+        }
+      case 'flower': 
+        {
+          const flowerColors = {
+            plum: '#8e44ad',
+            orchid: '#3498db',
+            bamboo: '#27ae60',
+            chrysanthemum: '#e67e22'
+          };
+          let fill = flowerColors[value] || 'pink';
+          return `<svg class="face" viewBox="0 0 100 100">
+                    <defs>
+                      <radialGradient id="flower-grad-${value}" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" style="stop-color:#fff;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:${fill};stop-opacity:1" />
+                      </radialGradient>
+                    </defs>
+                    <circle cx="50" cy="50" r="35" fill="url(#flower-grad-${value})"/>
+                    <circle cx="50" cy="50" r="10" fill="yellow"/>
+                  </svg>`;
+        }
+      case 'season': 
+        {
+          const seasonSymbols = {
+            spring: 'S',
+            summer: 'Su',
+            autumn: 'A',
+            winter: 'W'
+          };
+          let display = seasonSymbols[value] || value;
+          return `<svg class="face" viewBox="0 0 100 100">
+                    <defs>
+                      <linearGradient id="season-grad-${value}" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#ff9a9e;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#fad0c4;stop-opacity:1" />
+                      </linearGradient>
+                    </defs>
+                    <rect x="10" y="10" width="80" height="80" fill="url(#season-grad-${value})" rx="10"/>
+                    <text x="50" y="55" fill="#fff" text-anchor="middle" dominant-baseline="middle" font-size="40" font-family="Georgia, serif">${display}</text>
+                  </svg>`;
+        }
+      default:
         return `<svg class="face" viewBox="0 0 100 100">
-          <rect x="45" y="20" width="10" height="${60 - parseInt(value) * 3}" fill="${color}"/>
-        </svg>`;
-      case 'wind':
-        const winds = { n: '北', s: '南', e: '東', w: '西' };
-        return `<svg class="face" viewBox="0 0 100 100">
-          <text x="50" y="50" fill="${color}" text-anchor="middle" dominant-baseline="middle" font-size="40">${winds[value]}</text>
-        </svg>`;
-      case 'dragon':
-        const dragons = { white: '白', green: '發', red: '中' };
-        return `<svg class="face" viewBox="0 0 100 100">
-          <text x="50" y="50" fill="${color}" text-anchor="middle" dominant-baseline="middle" font-size="40">${dragons[value]}</text>
-        </svg>`;
-      case 'flower':
-        const flowerColors = {
-          plum: 'purple',
-          orchid: 'blue',
-          bamboo: 'green',
-          chrysanthemum: 'orange'
-        };
-        let fill = flowerColors[value] || 'pink';
-        return `<svg class="face" viewBox="0 0 100 100">
-          <circle cx="50" cy="50" r="10" fill="yellow"/>
-          <circle cx="30" cy="30" r="10" fill="${fill}"/>
-          <circle cx="70" cy="30" r="10" fill="${fill}"/>
-          <circle cx="30" cy="70" r="10" fill="${fill}"/>
-          <circle cx="70" cy="70" r="10" fill="${fill}"/>
-        </svg>`;
-      case 'season':
-        const seasonSymbols = {
-          spring: 'S',
-          summer: 'Su',
-          autumn: 'A',
-          winter: 'W'
-        };
-        let display = seasonSymbols[value] || value;
-        return `<svg class="face" viewBox="0 0 100 100">
-          <text x="50" y="50" fill="${color}" text-anchor="middle" dominant-baseline="middle" font-size="40">${display}</text>
-        </svg>`;
+                  <text x="50" y="50" fill="${color}" text-anchor="middle" dominant-baseline="middle" font-size="40">${value}</text>
+                </svg>`;
     }
   }
 
