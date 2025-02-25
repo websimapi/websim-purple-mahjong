@@ -349,7 +349,8 @@ class MahjongGame {
   initPanZoom() {
     const container = document.getElementById('board-container');
     const boardEl = document.getElementById('board');
-    const initialRotation = 'rotateX(45deg) rotateZ(45deg)';
+    let rotationX = 45;
+    let rotationZ = 45;
     const panZoom = {
       panX: 0,
       panY: 0,
@@ -363,7 +364,7 @@ class MahjongGame {
     };
 
     const updateBoardTransform = () => {
-      boardEl.style.transform = `translate(${panZoom.panX}px, ${panZoom.panY}px) scale(${panZoom.scale}) ${initialRotation}`;
+      boardEl.style.transform = `translate(${panZoom.panX}px, ${panZoom.panY}px) scale(${panZoom.scale}) rotateX(${rotationX}deg) rotateZ(${rotationZ}deg)`;
     };
 
     container.addEventListener('touchstart', (e) => {
@@ -408,7 +409,6 @@ class MahjongGame {
       }
     });
 
-    // Mouse events for desktop panning
     container.addEventListener('mousedown', (e) => {
       panZoom.isPanning = true;
       panZoom.startTouches = [{ x: e.clientX, y: e.clientY }];
@@ -433,7 +433,6 @@ class MahjongGame {
       panZoom.isPanning = false;
     });
 
-    // Wheel zoom for desktop
     container.addEventListener('wheel', (e) => {
       e.preventDefault();
       let zoomFactor = 1 - e.deltaY / 500;
@@ -442,6 +441,41 @@ class MahjongGame {
       if (panZoom.scale > 3) panZoom.scale = 3;
       updateBoardTransform();
     });
+
+    const menuButton = document.getElementById('menu-button');
+    const controlsPanel = document.getElementById('controls-panel');
+
+    menuButton.addEventListener('click', () => {
+      controlsPanel.style.display = (controlsPanel.style.display === 'flex') ? 'none' : 'flex';
+    });
+    document.getElementById('close-controls').addEventListener('click', () => {
+      controlsPanel.style.display = 'none';
+    });
+    document.getElementById('rotate-left').addEventListener('click', () => {
+      rotationZ -= 15;
+      updateBoardTransform();
+    });
+    document.getElementById('rotate-right').addEventListener('click', () => {
+      rotationZ += 15;
+      updateBoardTransform();
+    });
+    document.getElementById('top-down').addEventListener('click', () => {
+      rotationX = 90;
+      rotationZ = 0;
+      updateBoardTransform();
+    });
+    document.getElementById('zoom-in').addEventListener('click', () => {
+      panZoom.scale *= 1.1;
+      if (panZoom.scale > 3) panZoom.scale = 3;
+      updateBoardTransform();
+    });
+    document.getElementById('zoom-out').addEventListener('click', () => {
+      panZoom.scale *= 0.9;
+      if (panZoom.scale < 0.5) panZoom.scale = 0.5;
+      updateBoardTransform();
+    });
+
+    updateBoardTransform();
   }
 }
 
