@@ -85,13 +85,8 @@ body {
 }
 
 .tile .face {
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.tile.selected .face,
-.tile:hover .face {
   opacity: 1;
+  transition: opacity 0.3s ease;
 }
 
 .tile.matched .face {
