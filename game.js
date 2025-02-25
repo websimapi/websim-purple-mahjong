@@ -162,10 +162,28 @@ class MahjongGame {
         return `<svg class="face" viewBox="0 0 100 100">
           <text x="50" y="50" fill="${color}" text-anchor="middle" dominant-baseline="middle" font-size="40">${value}</text>
         </svg>`;
-      case 'p': // Circle tiles
-        return `<svg class="face" viewBox="0 0 100 100">
-          <circle cx="50" cy="50" r="${20 + parseInt(value) * 2}" stroke="${color}" fill="none" stroke-width="3"/>
-        </svg>`;
+      case 'p': // Circle tiles - updated unique design
+        {
+          const number = parseInt(value);
+          const circlePositions = {
+            1: [{ cx: 50, cy: 50 }],
+            2: [{ cx: 30, cy: 30 }, { cx: 70, cy: 70 }],
+            3: [{ cx: 30, cy: 30 }, { cx: 50, cy: 50 }, { cx: 70, cy: 70 }],
+            4: [{ cx: 30, cy: 30 }, { cx: 70, cy: 30 }, { cx: 30, cy: 70 }, { cx: 70, cy: 70 }],
+            5: [{ cx: 30, cy: 30 }, { cx: 70, cy: 30 }, { cx: 50, cy: 50 }, { cx: 30, cy: 70 }, { cx: 70, cy: 70 }],
+            6: [{ cx: 30, cy: 30 }, { cx: 30, cy: 50 }, { cx: 30, cy: 70 }, { cx: 70, cy: 30 }, { cx: 70, cy: 50 }, { cx: 70, cy: 70 }],
+            7: [{ cx: 30, cy: 30 }, { cx: 30, cy: 50 }, { cx: 30, cy: 70 }, { cx: 70, cy: 30 }, { cx: 70, cy: 50 }, { cx: 70, cy: 70 }, { cx: 50, cy: 50 }],
+            8: [{ cx: 30, cy: 30 }, { cx: 50, cy: 30 }, { cx: 70, cy: 30 }, { cx: 30, cy: 50 }, { cx: 70, cy: 50 }, { cx: 30, cy: 70 }, { cx: 50, cy: 70 }, { cx: 70, cy: 70 }],
+            9: [{ cx: 30, cy: 30 }, { cx: 50, cy: 30 }, { cx: 70, cy: 30 }, { cx: 30, cy: 50 }, { cx: 50, cy: 50 }, { cx: 70, cy: 50 }, { cx: 30, cy: 70 }, { cx: 50, cy: 70 }, { cx: 70, cy: 70 }]
+          };
+          const positions = circlePositions[number] || [];
+          let svgContent = `<svg class="face" viewBox="0 0 100 100">`;
+          positions.forEach(pos => {
+            svgContent += `<circle cx="${pos.cx}" cy="${pos.cy}" r="8" fill="${color}" />`;
+          });
+          svgContent += `</svg>`;
+          return svgContent;
+        }
       case 's': // Bamboo tiles
         return `<svg class="face" viewBox="0 0 100 100">
           <rect x="45" y="20" width="10" height="${60 - parseInt(value) * 3}" fill="${color}"/>
