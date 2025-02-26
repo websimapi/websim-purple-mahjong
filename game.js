@@ -1,13 +1,54 @@
-const GAME_DURATION = 120; // seconds
-const BOARD_LAYERS = 4;
-const LAYER_SIZE = { width: 8, height: 6 };
-const TILE_TYPES = {
-  DOTS: 'p',
-  BAMBOO: 's',
-  CHARACTERS: 'm',
-  WINDS: 'wind',
-  DRAGONS: 'dragon'
+/**
+ * CONFIGURATION & LEVELS
+ */
+const LAYOUTS = {
+  classic: (x, y, z) => {
+    // Standard pyramid/block structure
+    if (z === 0) return x >= 0 && x < 8 && y >= 0 && y < 6;
+    if (z === 1) return x >= 1 && x < 7 && y >= 1 && y < 5;
+    if (z === 2) return x >= 2 && x < 6 && y >= 2 && y < 4;
+    if (z === 3) return x >= 3 && x < 5 && y >= 2 && y < 4; // Top peak
+    return false;
+  },
+  pyramid: (x, y, z) => {
+    // Perfect pyramid
+    const size = 8;
+    const center = size / 2;
+    if (z > 4) return false;
+    const margin = z; // shrink by 1 each layer
+    return x >= margin && x < size - margin && y >= margin && y < size - margin - 2;
+  },
+  walls: (x, y, z) => {
+    // High walls on sides
+    if (z === 0) return x >= 0 && x < 8 && y >= 0 && y < 6;
+    if (z > 0 && z < 4) return (x === 0 || x === 7 || y === 0 || y === 5);
+    return false;
+  },
+  arena: (x, y, z) => {
+    // Hollow center
+    if (z === 0) return x >= 0 && x < 8 && y >= 0 && y < 6;
+    if (z > 0) return (x < 2 || x > 5 || y < 2 || y > 3);
+    return false;
+  }
 };
+
+const LEVELS = [
+  { id: 1, name: "Novice Steps", layout: 'classic', time: 300, points: 100 },
+  { id: 2, name: "The Arena", layout: 'arena', time: 400, points: 120, unlockTheme: 'nature' },
+  { id: 3, name: "Great Walls", layout: 'walls', time: 500, points: 150, unlockTheme: 'sunset' },
+  { id: 4, name: "Golden Pyramid", layout: 'pyramid', time: 600, points: 200, unlockTheme: 'ocean' }
+];
+
+const THEMES = {
+  default: { name: "Royal Purple", class: "theme-default" },
+  nature: { name: "Bamboo Forest", class: "theme-nature" },
+  sunset: { name: "Crimson Sunset", class: "theme-sunset" },
+  ocean: { name: "Deep Ocean", class: "theme-ocean" }
+};
+
+/**
+ * GAME CLASSES
+ */
 
 class MahjongTile {
   constructor(symbol, x, y, z) {
@@ -19,71 +60,88 @@ class MahjongTile {
     this.isMatched = false;
   }
 
-  isFree(board) {
-    // A tile is free if it has no tile above it and at least one side exposed
-    const hasAbove = board.tiles.some(t => 
+  // Returns { blocked: boolean, blockers: Array<Tile> }
+  checkBlocked(board) {
+    // A tile is blocked if it has a tile directly above
+    const tileAbove = board.tiles.find(t => 
       t.x === this.x && t.y === this.y && t.z === this.z + 1 && !t.isMatched
     );
-    if (hasAbove) return false;
+    
+    if (tileAbove) return { blocked: true, blockers: [tileAbove] };
 
-    // Check if either left or right side is exposed
+    // Or if blocked on BOTH sides (Left and Right)
+    // Left
     const hasLeft = board.tiles.some(t =>
       t.x === this.x - 1 && t.y === this.y && t.z === this.z && !t.isMatched
     );
+    // Right
     const hasRight = board.tiles.some(t =>
       t.x === this.x + 1 && t.y === this.y && t.z === this.z && !t.isMatched
     );
 
-    return !hasLeft || !hasRight;
+    if (hasLeft && hasRight) {
+       // Find visual blockers for feedback
+       const leftBlocker = board.tiles.find(t => t.x === this.x - 1 && t.y === this.y && t.z === this.z && !t.isMatched);
+       const rightBlocker = board.tiles.find(t => t.x === this.x + 1 && t.y === this.y && t.z === this.z && !t.isMatched);
+       return { blocked: true, blockers: [leftBlocker, rightBlocker].filter(Boolean) };
+    }
+
+    return { blocked: false, blockers: [] };
   }
 }
 
 class MahjongBoard {
-  constructor() {
+  constructor(layoutType = 'classic') {
     this.tiles = [];
+    this.layoutFn = LAYOUTS[layoutType] || LAYOUTS.classic;
     this.generateBoard();
   }
 
   generateBoard() {
-    const symbols = this.generateSymbols();
-    let symbolIndex = 0;
-
-    // Create layered board structure
-    for (let z = 0; z < BOARD_LAYERS; z++) {
-      const layerWidth = LAYER_SIZE.width - z;
-      const layerHeight = LAYER_SIZE.height - z;
-      
-      for (let y = z; y < layerHeight; y++) {
-        for (let x = z; x < layerWidth; x++) {
-          if (symbolIndex < symbols.length) {
-            this.tiles.push(new MahjongTile(symbols[symbolIndex], x, y, z));
-            symbolIndex++;
+    // Calculate how many positions are valid for this layout
+    let positions = [];
+    for (let z = 0; z < 5; z++) {
+      for (let y = 0; y < 8; y++) {
+        for (let x = 0; x < 10; x++) {
+          if (this.layoutFn(x, y, z)) {
+            positions.push({x, y, z});
           }
         }
       }
     }
+
+    // Ensure even number of tiles for pairs
+    if (positions.length % 2 !== 0) {
+      positions.pop();
+    }
+
+    const symbols = this.generateSymbols(positions.length);
+    
+    positions.forEach((pos, i) => {
+      this.tiles.push(new MahjongTile(symbols[i], pos.x, pos.y, pos.z));
+    });
   }
 
-  generateSymbols() {
+  generateSymbols(count) {
+    const pairsNeeded = count / 2;
     const basicSymbols = [];
-    // Generate tiles for each suit (dots, bamboo, characters)
     ['p', 's', 'm'].forEach(suit => {
-      for (let i = 1; i <= 9; i++) {
-        basicSymbols.push(`${suit}-${i}`);
-      }
+      for (let i = 1; i <= 9; i++) basicSymbols.push(`${suit}-${i}`);
     });
-
-    // Add winds and dragons
     const winds = ['n', 's', 'e', 'w'].map(w => `wind-${w}`);
     const dragons = ['white', 'green', 'red'].map(d => `dragon-${d}`);
-    // Add additional unique symbols: flowers and seasons
     const flowers = ['plum', 'orchid', 'bamboo', 'chrysanthemum'].map(f => `flower-${f}`);
     const seasons = ['spring', 'summer', 'autumn', 'winter'].map(s => `season-${s}`);
 
-    const allSymbols = [...basicSymbols, ...winds, ...dragons, ...flowers, ...seasons];
-    // Create pairs
-    const pairs = [...allSymbols, ...allSymbols];
-    return this.shuffle(pairs);
+    const allTypes = [...basicSymbols, ...winds, ...dragons, ...flowers, ...seasons];
+    
+    let pool = [];
+    for (let i = 0; i < pairsNeeded; i++) {
+      // Loop through available symbols
+      const sym = allTypes[i % allTypes.length];
+      pool.push(sym, sym);
+    }
+    return this.shuffle(pool);
   }
 
   shuffle(array) {
@@ -97,179 +155,270 @@ class MahjongBoard {
 
 class MahjongGame {
   constructor() {
-    this.board = null;
-    this.selectedTiles = [];
-    this.score = 0;
-    this.timeLeft = GAME_DURATION;
+    this.state = {
+      level: 1,
+      score: 0,
+      unlockedLevels: [1],
+      unlockedThemes: ['default'],
+      activeTheme: 'default'
+    };
+    
+    this.loadProgress();
+
+    // DOM Elements
     this.boardElement = document.getElementById('board');
+    this.boardContainer = document.getElementById('board-container');
     this.scoreElement = document.getElementById('score-value');
     this.timeElement = document.getElementById('time-value');
-    this.isProcessing = false; // Prevent further tile clicks while checking matches
-    this.initGame();
-    this.initPanZoom();
+    this.levelDisplay = document.getElementById('level-display');
+    
+    // Screens
+    this.screens = {
+      menu: document.getElementById('main-menu'),
+      level: document.getElementById('level-select'),
+      theme: document.getElementById('theme-select'),
+      gameover: document.getElementById('game-over')
+    };
+
+    // Game Variables
+    this.board = null;
+    this.selectedTiles = [];
+    this.timer = null;
+    this.timeLeft = 0;
+    this.isProcessing = false;
+    this.cameraAngle = { rotateX: 45, rotateZ: 45 };
+    
+    // Transform / Pan / Zoom state
+    this.panZoom = {
+      panX: 0, panY: 0, scale: 1,
+      isPanning: false, isZooming: false, isRotating: false,
+      startTouches: [], startPan: {x:0, y:0}, startRotation: {x:0, z:0},
+      startDistance: 0, initialScale: 1
+    };
+
+    this.initUI();
+    this.initControls();
+    this.applyTheme(this.state.activeTheme);
   }
 
-  initGame() {
-    this.boardElement.innerHTML = '';
+  loadProgress() {
+    const saved = localStorage.getItem('mahjong_quest_save');
+    if (saved) {
+      this.state = JSON.parse(saved);
+    }
+  }
+
+  saveProgress() {
+    localStorage.setItem('mahjong_quest_save', JSON.stringify(this.state));
+  }
+
+  initUI() {
+    // Main Menu
+    document.getElementById('play-btn').onclick = () => this.startLevel(this.state.level);
+    document.getElementById('levels-btn').onclick = () => this.showLevelSelect();
+    document.getElementById('themes-btn').onclick = () => this.showThemeSelect();
+    
+    // In-game
+    document.getElementById('menu-btn').onclick = () => {
+      clearInterval(this.timer);
+      this.showScreen('menu');
+    };
+
+    // Game Over
+    document.getElementById('next-level-btn').onclick = () => {
+      const nextId = this.state.level + 1;
+      if (LEVELS.find(l => l.id === nextId)) {
+        this.startLevel(nextId);
+      } else {
+        this.startLevel(1); // Loop back or handled nicely
+      }
+    };
+    document.getElementById('retry-btn').onclick = () => this.startLevel(this.state.level);
+    document.getElementById('home-btn').onclick = () => this.showScreen('menu');
+
+    // Back buttons
+    document.querySelectorAll('.back-btn').forEach(btn => {
+      btn.onclick = () => this.showScreen('menu');
+    });
+
+    // Mobile controls
+    document.querySelectorAll('.control-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const action = btn.dataset.action;
+        const ROT_STEP = 15;
+        if (action === 'up') this.cameraAngle.rotateX = Math.max(10, this.cameraAngle.rotateX - ROT_STEP);
+        if (action === 'down') this.cameraAngle.rotateX = Math.min(80, this.cameraAngle.rotateX + ROT_STEP);
+        if (action === 'left') this.cameraAngle.rotateZ -= ROT_STEP;
+        if (action === 'right') this.cameraAngle.rotateZ += ROT_STEP;
+        if (action === 'reset') { this.cameraAngle.rotateX = 45; this.cameraAngle.rotateZ = 45; this.panZoom.panX = 0; this.panZoom.panY = 0; this.panZoom.scale = 1; }
+        this.updateBoardTransform();
+      });
+    });
+  }
+
+  showScreen(screenName) {
+    Object.values(this.screens).forEach(s => s.classList.remove('active'));
+    if (this.screens[screenName]) this.screens[screenName].classList.add('active');
+  }
+
+  showLevelSelect() {
+    const grid = document.getElementById('levels-grid');
+    grid.innerHTML = '';
+    LEVELS.forEach(lvl => {
+      const el = document.createElement('div');
+      el.className = `grid-item ${this.state.unlockedLevels.includes(lvl.id) ? '' : 'locked'}`;
+      el.innerHTML = `<h3>${lvl.name}</h3>`;
+      if (this.state.unlockedLevels.includes(lvl.id)) {
+        el.onclick = () => this.startLevel(lvl.id);
+      }
+      grid.appendChild(el);
+    });
+    this.showScreen('level');
+  }
+
+  showThemeSelect() {
+    const grid = document.getElementById('themes-grid');
+    grid.innerHTML = '';
+    Object.keys(THEMES).forEach(key => {
+      const theme = THEMES[key];
+      const isUnlocked = this.state.unlockedThemes.includes(key);
+      const el = document.createElement('div');
+      el.className = `grid-item ${isUnlocked ? '' : 'locked'} ${this.state.activeTheme === key ? 'selected' : ''}`;
+      el.innerHTML = `<h3>${theme.name}</h3>`;
+      if (isUnlocked) {
+        el.onclick = () => {
+          this.applyTheme(key);
+          this.showThemeSelect(); // Refresh UI
+        };
+      }
+      grid.appendChild(el);
+    });
+    this.showScreen('theme');
+  }
+
+  applyTheme(themeKey) {
+    this.state.activeTheme = themeKey;
+    this.saveProgress();
+    document.body.className = THEMES[themeKey].class;
+  }
+
+  startLevel(levelId) {
+    const levelConfig = LEVELS.find(l => l.id === levelId) || LEVELS[0];
+    this.state.level = levelId;
+    this.showScreen('none'); // Hide all screens
     this.score = 0;
-    this.timeLeft = GAME_DURATION;
+    this.timeLeft = levelConfig.time;
+    
+    this.updateHUD();
+    
+    this.board = new MahjongBoard(levelConfig.layout);
+    this.renderBoard();
+    
+    if (this.timer) clearInterval(this.timer);
+    this.timer = setInterval(() => {
+      this.timeLeft--;
+      this.updateHUD();
+      if (this.timeLeft <= 0) this.endGame(false);
+    }, 1000);
+
+    // Reset Camera
+    this.panZoom.panX = 0;
+    this.panZoom.panY = 0;
+    this.panZoom.scale = window.innerWidth < 600 ? 0.8 : 1;
+    this.cameraAngle = { rotateX: 45, rotateZ: 45 };
+    this.updateBoardTransform();
+  }
+
+  updateHUD() {
     this.scoreElement.textContent = this.score;
     this.timeElement.textContent = this.timeLeft;
-    this.board = new MahjongBoard();
-    this.renderBoard();
-
-    if (this.timer) clearInterval(this.timer);
-    this.timer = setInterval(() => this.updateTimer(), 1000);
+    this.levelDisplay.textContent = LEVELS.find(l => l.id === this.state.level).name;
+    if (this.timeLeft < 30) this.timeElement.style.color = 'red';
+    else this.timeElement.style.color = 'white';
   }
 
   renderBoard() {
+    this.boardElement.innerHTML = '';
     this.board.tiles.forEach(tile => {
-      const element = this.createTileElement(tile);
-      tile.element = element;
-      this.boardElement.appendChild(element);
+      const el = this.createTileElement(tile);
+      tile.element = el;
+      this.boardElement.appendChild(el);
     });
     this.updateTileStates();
   }
 
   createTileElement(tile) {
-    const element = document.createElement('div');
-    element.className = 'tile';
-    element.innerHTML = this.createSymbolSVG(tile.symbol);
-    element.style.zIndex = tile.z * 10;  // Ensure higher-layer tiles appear on top
+    const el = document.createElement('div');
+    el.className = 'tile';
+    el.innerHTML = this.createSymbolSVG(tile.symbol);
+    el.style.zIndex = tile.z * 10;
     
-    // Position tile in 3D space
-    const tileWidth = 62; // Slightly larger than CSS width for spacing
-    const tileHeight = 82;
-    const tileDepth = 20;
+    const w = 52; const h = 72; const d = 15;
     
-    element.style.transform = `
-      translate3d(
-        ${tile.x * tileWidth}px,
-        ${tile.y * tileHeight}px,
-        ${tile.z * tileDepth}px
-      )
-    `;
+    // Center the board roughly
+    const offsetX = (8 * w) / 2;
+    const offsetY = (6 * h) / 2;
+
+    el.style.transform = `translate3d(${(tile.x * w) - offsetX}px, ${(tile.y * h) - offsetY}px, ${tile.z * d}px)`;
     
-    element.addEventListener('click', () => this.handleTileClick(tile));
-    return element;
+    el.onclick = (e) => {
+      e.stopPropagation();
+      this.handleTileClick(tile);
+    };
+    return el;
   }
 
   createSymbolSVG(symbol) {
-    const emojis = {
+    const [type, value] = symbol.split('-');
+    const emojiMap = {
       m: ["😀", "😃", "😄", "😁", "😆", "😅", "😂", "🙂", "😉"],
       p: ["🍎", "🍊", "🍋", "🍌", "🍉", "🍇", "🍓", "🍒", "🥝"],
-      s: ["🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨"]
+      s: ["🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨"],
+      wind: { n: "⬆️", s: "⬇️", e: "➡️", w: "⬅️" },
+      dragon: { red: "🐉", green: "🐲", white: "⚪" },
+      flower: { plum: "🌸", orchid: "🌹", bamboo: "🌺", chrysanthemum: "🌼" },
+      season: { spring: "🌱", summer: "🌞", autumn: "🍂", winter: "❄️" }
     };
 
-    const windEmojis = { 
-      n: "⬆️",
-      s: "⬇️",
-      e: "➡️",
-      w: "⬅️"
-    };
-    const dragonEmojis = {
-      red: "🐉", 
-      green: "🐲", 
-      white: "⚪"
-    };
-    const flowerEmojis = {
-      plum: "🌸",
-      orchid: "🌹",
-      bamboo: "🌺",
-      chrysanthemum: "🌼"
-    };
-    const seasonEmojis = {
-      spring: "🌱",
-      summer: "🌞",
-      autumn: "🍂",
-      winter: "❄️"
-    };
-
-    const [type, value] = symbol.split('-');
-
-    let emoji = "❓"; // default placeholder
-
-    switch (type) {
-      case 'm': {
-        const index = parseInt(value, 10) - 1;
-        emoji = emojis.m[index] || emoji;
-        break;
-      }
-      case 'p': {
-        const index = parseInt(value, 10) - 1;
-        emoji = emojis.p[index] || emoji;
-        break;
-      }
-      case 's': {
-        const index = parseInt(value, 10) - 1;
-        emoji = emojis.s[index] || emoji;
-        break;
-      }
-      case 'wind': {
-        emoji = windEmojis[value] || emoji;
-        break;
-      }
-      case 'dragon': {
-        emoji = dragonEmojis[value] || emoji;
-        break;
-      }
-      case 'flower': {
-        emoji = flowerEmojis[value] || emoji;
-        break;
-      }
-      case 'season': {
-        emoji = seasonEmojis[value] || emoji;
-        break;
-      }
-      default: {
-        emoji = value;
-        break;
-      }
+    let emoji = "❓";
+    if (['m','p','s'].includes(type)) {
+      emoji = emojiMap[type][parseInt(value)-1] || emoji;
+    } else if (emojiMap[type]) {
+      emoji = emojiMap[type][value] || emoji;
     }
-    return `<svg class="face" viewBox="0 0 100 100">
-              <text x="50" y="50" text-anchor="middle" dominant-baseline="middle" font-size="60">
-                ${emoji}
-              </text>
-            </svg>`;
-  }
 
-  updateTileStates() {
-    this.board.tiles.forEach(tile => {
-      if (!tile.isMatched && tile.element) {
-        const isFree = tile.isFree(this.board);
-        tile.element.classList.toggle('disabled', !isFree);
-        tile.element.classList.toggle('free', isFree);  // Mark free tiles visually
-      }
-    });
+    return `<svg class="face" viewBox="0 0 100 100"><text x="50" y="55" text-anchor="middle" dominant-baseline="middle" font-size="65">${emoji}</text></svg>`;
   }
 
   handleTileClick(tile) {
-    if (tile.isMatched) return;
-    if (!tile.isFree(this.board)) {
-      // If tile is not free, highlight the blocking (upper) tile to show what's on top
-      const blockingTile = this.board.tiles.find(t => 
-        t.x === tile.x && t.y === tile.y && t.z === tile.z + 1 && !t.isMatched
-      );
-      if (blockingTile && blockingTile.element) {
-        blockingTile.element.classList.add('highlight');
-        setTimeout(() => blockingTile.element.classList.remove('highlight'), 500);
-      }
+    if (tile.isMatched || this.isProcessing) return;
+
+    const status = tile.checkBlocked(this.board);
+    if (status.blocked) {
+      // Visual feedback on blockers
+      status.blockers.forEach(b => {
+        if (b.element) {
+          b.element.classList.remove('blocked-feedback');
+          void b.element.offsetWidth; // trigger reflow
+          b.element.classList.add('blocked-feedback');
+        }
+      });
       return;
     }
-    
-    // Allow deselecting a tile if already selected
+
+    // Toggle selection
     if (this.selectedTiles.includes(tile)) {
       tile.element.classList.remove('selected');
       this.selectedTiles = this.selectedTiles.filter(t => t !== tile);
       return;
     }
-    
-    // Prevent selecting more than two tiles at a time
+
     if (this.selectedTiles.length >= 2) return;
-    
+
     tile.element.classList.add('selected');
     this.selectedTiles.push(tile);
-    
+
     if (this.selectedTiles.length === 2) {
       this.checkMatch();
     }
@@ -277,206 +426,188 @@ class MahjongGame {
 
   checkMatch() {
     this.isProcessing = true;
-    const [tile1, tile2] = this.selectedTiles;
-    const match = tile1.symbol === tile2.symbol;
+    const [t1, t2] = this.selectedTiles;
+    
+    if (t1.symbol === t2.symbol) {
+      const points = 100 * (1 + (t1.z * 0.5));
+      this.score += Math.floor(points);
+      
+      // Popup
+      const pop = document.createElement('div');
+      pop.className = 'score-popup';
+      pop.textContent = `+${Math.floor(points)}`;
+      // Position relative to screen for simplicity or board
+      const rect = t1.element.getBoundingClientRect();
+      pop.style.left = rect.left + 'px';
+      pop.style.top = rect.top + 'px';
+      document.body.appendChild(pop);
+      setTimeout(() => pop.remove(), 800);
 
-    if (match) {
-      this.handleMatch(tile1, tile2);
-    } else {
+      t1.isMatched = t2.isMatched = true;
+      t1.element.classList.add('matched');
+      t2.element.classList.add('matched');
+      
       setTimeout(() => {
-        tile1.element.classList.remove('selected');
-        tile2.element.classList.remove('selected');
-        this.selectedTiles = [];
-        this.isProcessing = false;
-      }, 1000);
-    }
-  }
-
-  handleMatch(tile1, tile2) {
-    const points = 100 + (tile1.z * 50); // More points for higher layers
-    this.score += points;
-    this.scoreElement.textContent = this.score;
-    
-    // Show floating score popup
-    const popup = document.createElement('div');
-    popup.className = 'score-popup';
-    popup.textContent = `+${points}`;
-    popup.style.left = `${tile1.element.offsetLeft}px`;
-    popup.style.top = `${tile1.element.offsetTop}px`;
-    this.boardElement.appendChild(popup);
-    
-    setTimeout(() => popup.remove(), 1000);
-
-    // Mark tiles as matched
-    tile1.isMatched = tile2.isMatched = true;
-    
-    setTimeout(() => {
-      tile1.element.classList.add('matched');
-      tile2.element.classList.add('matched');
-      // Remove the tile elements completely after the fade-out animation
-      setTimeout(() => {
-        if (tile1.element && tile1.element.parentNode) tile1.element.parentNode.removeChild(tile1.element);
-        if (tile2.element && tile2.element.parentNode) tile2.element.parentNode.removeChild(tile2.element);
+        if(t1.element) t1.element.style.display = 'none';
+        if(t2.element) t2.element.style.display = 'none';
         this.selectedTiles = [];
         this.updateTileStates();
-        this.checkWin();
         this.isProcessing = false;
+        
+        if (this.board.tiles.every(t => t.isMatched)) {
+          this.endGame(true);
+        }
       }, 500);
-    }, 500);
-  }
-
-  checkWin() {
-    if (this.board.tiles.every(tile => tile.isMatched)) {
-      clearInterval(this.timer);
+      
+      this.updateHUD();
+    } else {
       setTimeout(() => {
-        alert(`Congratulations! You won with score ${this.score}!`);
-        this.initGame();
-      }, 500);
+        t1.element.classList.remove('selected');
+        t2.element.classList.remove('selected');
+        this.selectedTiles = [];
+        this.isProcessing = false;
+      }, 800);
     }
   }
 
-  updateTimer() {
-    this.timeLeft--;
-    this.timeElement.textContent = this.timeLeft;
+  updateTileStates() {
+    this.board.tiles.forEach(tile => {
+      if (!tile.isMatched && tile.element) {
+        const { blocked } = tile.checkBlocked(this.board);
+        tile.element.classList.toggle('disabled', blocked);
+      }
+    });
+  }
+
+  endGame(win) {
+    clearInterval(this.timer);
+    const title = document.getElementById('game-over-title');
+    const msg = document.getElementById('game-over-msg');
+    const nextBtn = document.getElementById('next-level-btn');
     
-    if (this.timeLeft <= 0) {
-      clearInterval(this.timer);
-      alert(`Time's up! Your score: ${this.score}`);
-      this.initGame();
+    if (win) {
+      title.textContent = "Level Complete! 🎉";
+      msg.textContent = `Final Score: ${this.score}`;
+      nextBtn.style.display = 'block';
+      
+      // Unlock next level
+      const nextLvl = this.state.level + 1;
+      if (!this.state.unlockedLevels.includes(nextLvl) && LEVELS.find(l => l.id === nextLvl)) {
+        this.state.unlockedLevels.push(nextLvl);
+      }
+
+      // Unlock theme?
+      const currentLvlConfig = LEVELS.find(l => l.id === this.state.level);
+      if (currentLvlConfig && currentLvlConfig.unlockTheme) {
+        if (!this.state.unlockedThemes.includes(currentLvlConfig.unlockTheme)) {
+          this.state.unlockedThemes.push(currentLvlConfig.unlockTheme);
+          msg.textContent += `\nNew Theme Unlocked: ${THEMES[currentLvlConfig.unlockTheme].name}!`;
+        }
+      }
+      this.saveProgress();
+    } else {
+      title.textContent = "Time's Up! 😢";
+      msg.textContent = "Try again!";
+      nextBtn.style.display = 'none';
     }
+    
+    this.showScreen('gameover');
   }
 
-  initPanZoom() {
-    const container = document.getElementById('board-container');
-    const boardEl = document.getElementById('board');
-    let rotationX = 45;
-    let rotationZ = 45;
-    const panZoom = {
-      panX: 0,
-      panY: 0,
-      scale: 1,
-      isPanning: false,
-      isZooming: false,
-      startTouches: [],
-      startPan: { x: 0, y: 0 },
-      startDistance: 0,
-      initialScale: 1
-    };
+  initControls() {
+    const c = this.boardContainer;
+    
+    // Pan and Zoom
+    c.addEventListener('mousedown', e => {
+      if (e.button === 2) { // Right drag rotate
+        this.panZoom.isRotating = true;
+        this.panZoom.startTouches = [{x:e.clientX, y:e.clientY}];
+        this.panZoom.startRotation = {...this.cameraAngle};
+      } else if (e.button === 0) { // Left drag pan
+        this.panZoom.isPanning = true;
+        this.panZoom.startTouches = [{x:e.clientX, y:e.clientY}];
+        this.panZoom.startPan = {x:this.panZoom.panX, y:this.panZoom.panY};
+      }
+    });
 
-    const updateBoardTransform = () => {
-      boardEl.style.transform = `translate(${panZoom.panX}px, ${panZoom.panY}px) scale(${panZoom.scale}) rotateX(${rotationX}deg) rotateZ(${rotationZ}deg)`;
-    };
+    window.addEventListener('mousemove', e => {
+      if (this.panZoom.isRotating) {
+        const dx = e.clientX - this.panZoom.startTouches[0].x;
+        const dy = e.clientY - this.panZoom.startTouches[0].y;
+        this.cameraAngle.rotateZ = this.panZoom.startRotation.z + (dx * 0.5);
+        this.cameraAngle.rotateX = Math.max(10, Math.min(80, this.panZoom.startRotation.x - (dy * 0.5)));
+        this.updateBoardTransform();
+      } else if (this.panZoom.isPanning) {
+        const dx = e.clientX - this.panZoom.startTouches[0].x;
+        const dy = e.clientY - this.panZoom.startTouches[0].y;
+        this.panZoom.panX = this.panZoom.startPan.x + dx;
+        this.panZoom.panY = this.panZoom.startPan.y + dy;
+        this.updateBoardTransform();
+      }
+    });
 
-    container.addEventListener('touchstart', (e) => {
+    window.addEventListener('mouseup', () => {
+      this.panZoom.isPanning = false;
+      this.panZoom.isRotating = false;
+    });
+    
+    // Wheel Zoom
+    c.addEventListener('wheel', e => {
+      e.preventDefault();
+      const delta = e.deltaY * -0.001;
+      this.panZoom.scale = Math.min(Math.max(.5, this.panZoom.scale + delta), 3);
+      this.updateBoardTransform();
+    }, {passive:false});
+
+    // Touch
+    c.addEventListener('touchstart', e => {
       if (e.touches.length === 1) {
-        panZoom.isPanning = true;
-        panZoom.startTouches = [{ x: e.touches[0].clientX, y: e.touches[0].clientY }];
-        panZoom.startPan = { x: panZoom.panX, y: panZoom.panY };
+        this.panZoom.isPanning = true;
+        this.panZoom.startTouches = [{x:e.touches[0].clientX, y:e.touches[0].clientY}];
+        this.panZoom.startPan = {x:this.panZoom.panX, y:this.panZoom.panY};
       } else if (e.touches.length === 2) {
-        panZoom.isZooming = true;
-        const touch1 = e.touches[0];
-        const touch2 = e.touches[1];
-        panZoom.startDistance = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
-        panZoom.initialScale = panZoom.scale;
+        this.panZoom.isZooming = true;
+        this.panZoom.startDistance = Math.hypot(
+          e.touches[1].clientX - e.touches[0].clientX,
+          e.touches[1].clientY - e.touches[0].clientY
+        );
+        this.panZoom.initialScale = this.panZoom.scale;
       }
-    }, { passive: false });
+    }, {passive:false});
 
-    container.addEventListener('touchmove', (e) => {
-      if (panZoom.isPanning && e.touches.length === 1) {
-        const dx = e.touches[0].clientX - panZoom.startTouches[0].x;
-        const dy = e.touches[0].clientY - panZoom.startTouches[0].y;
-        panZoom.panX = panZoom.startPan.x + dx;
-        panZoom.panY = panZoom.startPan.y + dy;
-        updateBoardTransform();
-      } else if (panZoom.isZooming && e.touches.length === 2) {
-        const touch1 = e.touches[0];
-        const touch2 = e.touches[1];
-        const currentDistance = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
-        panZoom.scale = panZoom.initialScale * (currentDistance / panZoom.startDistance);
-        if (panZoom.scale < 0.5) panZoom.scale = 0.5;
-        if (panZoom.scale > 3) panZoom.scale = 3;
-        updateBoardTransform();
-      }
+    c.addEventListener('touchmove', e => {
       e.preventDefault();
-    }, { passive: false });
-
-    container.addEventListener('touchend', (e) => {
-      if (e.touches.length < 2) {
-        panZoom.isZooming = false;
+      if (this.panZoom.isPanning && e.touches.length === 1) {
+        const dx = e.touches[0].clientX - this.panZoom.startTouches[0].x;
+        const dy = e.touches[0].clientY - this.panZoom.startTouches[0].y;
+        this.panZoom.panX = this.panZoom.startPan.x + dx;
+        this.panZoom.panY = this.panZoom.startPan.y + dy;
+        this.updateBoardTransform();
+      } else if (this.panZoom.isZooming && e.touches.length === 2) {
+        const dist = Math.hypot(
+          e.touches[1].clientX - e.touches[0].clientX,
+          e.touches[1].clientY - e.touches[0].clientY
+        );
+        this.panZoom.scale = this.panZoom.initialScale * (dist / this.panZoom.startDistance);
+        this.updateBoardTransform();
       }
-      if (e.touches.length === 0) {
-        panZoom.isPanning = false;
-      }
-    });
+    }, {passive:false});
 
-    container.addEventListener('mousedown', (e) => {
-      panZoom.isPanning = true;
-      panZoom.startTouches = [{ x: e.clientX, y: e.clientY }];
-      panZoom.startPan = { x: panZoom.panX, y: panZoom.panY };
+    c.addEventListener('touchend', () => {
+      this.panZoom.isPanning = false;
+      this.panZoom.isZooming = false;
     });
+  }
 
-    container.addEventListener('mousemove', (e) => {
-      if (panZoom.isPanning) {
-        const dx = e.clientX - panZoom.startTouches[0].x;
-        const dy = e.clientY - panZoom.startTouches[0].y;
-        panZoom.panX = panZoom.startPan.x + dx;
-        panZoom.panY = panZoom.startPan.y + dy;
-        updateBoardTransform();
-      }
-    });
-
-    container.addEventListener('mouseup', () => {
-      panZoom.isPanning = false;
-    });
-
-    container.addEventListener('mouseleave', () => {
-      panZoom.isPanning = false;
-    });
-
-    container.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      let zoomFactor = 1 - e.deltaY / 500;
-      panZoom.scale *= zoomFactor;
-      if (panZoom.scale < 0.5) panZoom.scale = 0.5;
-      if (panZoom.scale > 3) panZoom.scale = 3;
-      updateBoardTransform();
-    });
-
-    const menuButton = document.getElementById('menu-button');
-    const controlsPanel = document.getElementById('controls-panel');
-
-    menuButton.addEventListener('click', () => {
-      controlsPanel.style.display = (controlsPanel.style.display === 'flex') ? 'none' : 'flex';
-    });
-    document.getElementById('close-controls').addEventListener('click', () => {
-      controlsPanel.style.display = 'none';
-    });
-    document.getElementById('rotate-left').addEventListener('click', () => {
-      rotationZ -= 15;
-      updateBoardTransform();
-    });
-    document.getElementById('rotate-right').addEventListener('click', () => {
-      rotationZ += 15;
-      updateBoardTransform();
-    });
-    document.getElementById('top-down').addEventListener('click', () => {
-      rotationX = 90;
-      rotationZ = 0;
-      updateBoardTransform();
-    });
-    document.getElementById('zoom-in').addEventListener('click', () => {
-      panZoom.scale *= 1.1;
-      if (panZoom.scale > 3) panZoom.scale = 3;
-      updateBoardTransform();
-    });
-    document.getElementById('zoom-out').addEventListener('click', () => {
-      panZoom.scale *= 0.9;
-      if (panZoom.scale < 0.5) panZoom.scale = 0.5;
-      updateBoardTransform();
-    });
-
-    updateBoardTransform();
+  updateBoardTransform() {
+    this.boardElement.style.transform = 
+      `translate3d(${this.panZoom.panX}px, ${this.panZoom.panY}px, 0) ` +
+      `scale(${this.panZoom.scale}) ` +
+      `rotateX(${this.cameraAngle.rotateX}deg) ` +
+      `rotateZ(${this.cameraAngle.rotateZ}deg)`;
   }
 }
 
-new MahjongGame();
+document.addEventListener('DOMContentLoaded', () => {
+  window.game = new MahjongGame();
+});

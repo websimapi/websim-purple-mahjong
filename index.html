@@ -1,32 +1,72 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>3D Mahjong</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>3D Mahjong Quest</title>
   <link rel="stylesheet" href="styles.css">
-  <!-- Optional: Enable full-screen web app mode on some mobile devices -->
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
 <body>
+  <!-- Main Game UI -->
   <div id="game-container">
-    <div id="stats">
-      <div id="score">Score: <span id="score-value">0</span></div>
-      <div id="timer">Time: <span id="time-value">120</span>s</div>
+    <div id="hud">
+      <div class="hud-item" id="level-display">Level 1</div>
+      <div class="hud-item" id="score-container">⭐ <span id="score-value">0</span></div>
+      <div class="hud-item" id="timer-container">⏳ <span id="time-value">120</span>s</div>
+      <button id="menu-btn" class="hud-btn">☰</button>
     </div>
+
     <div id="board-container">
       <div id="board"></div>
     </div>
+
+    <!-- Mobile Controls -->
+    <div id="mobile-controls">
+      <div class="rotate-pad">
+        <button class="control-btn" data-action="up">⬆️</button>
+        <div class="row">
+          <button class="control-btn" data-action="left">⬅️</button>
+          <button class="control-btn" data-action="reset">⏺️</button>
+          <button class="control-btn" data-action="right">➡️</button>
+        </div>
+        <button class="control-btn" data-action="down">⬇️</button>
+      </div>
+    </div>
   </div>
-  <!-- New on-screen camera controls -->
-  <button id="menu-button">☰</button>
-  <div id="controls-panel">
-    <button id="rotate-left">⟲ Rotate Left</button>
-    <button id="rotate-right">⟳ Rotate Right</button>
-    <button id="top-down">Top-Down View</button>
-    <button id="zoom-in">Zoom In +</button>
-    <button id="zoom-out">Zoom Out -</button>
-    <button id="close-controls">Close</button>
+
+  <!-- Screens / Modals -->
+  <div id="main-menu" class="screen active">
+    <h1>🀄 Mahjong Quest 🀄</h1>
+    <div class="menu-content">
+      <button id="play-btn" class="primary-btn">Play</button>
+      <button id="levels-btn" class="secondary-btn">Select Level</button>
+      <button id="themes-btn" class="secondary-btn">Customize Theme</button>
+    </div>
   </div>
+
+  <div id="level-select" class="screen">
+    <h2>Select Level</h2>
+    <div id="levels-grid" class="grid-menu"></div>
+    <button class="back-btn secondary-btn">Back</button>
+  </div>
+
+  <div id="theme-select" class="screen">
+    <h2>Select Theme</h2>
+    <div id="themes-grid" class="grid-menu"></div>
+    <button class="back-btn secondary-btn">Back</button>
+  </div>
+
+  <div id="game-over" class="screen">
+    <h2 id="game-over-title">Level Complete!</h2>
+    <p id="game-over-msg">Score: 1200</p>
+    <div class="menu-content">
+      <button id="next-level-btn" class="primary-btn">Next Level</button>
+      <button id="retry-btn" class="secondary-btn">Retry</button>
+      <button id="home-btn" class="secondary-btn">Main Menu</button>
+    </div>
+  </div>
+
   <script type="module" src="game.js"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
