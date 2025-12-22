@@ -91,6 +91,29 @@ class MahjongTile {
 }
 
 class MahjongBoard {
+  hasMoves() {
+    const active = this.tiles.filter(t => !t.isMatched);
+    const free = active.filter(t => !t.checkBlocked(this).blocked);
+    const counts = {};
+    for (const t of free) {
+      counts[t.symbol] = (counts[t.symbol] || 0) + 1;
+      if (counts[t.symbol] >= 2) return true;
+    }
+    return false;
+  }
+
+  shuffleActiveTiles() {
+    const active = this.tiles.filter(t => !t.isMatched);
+    const symbols = active.map(t => t.symbol);
+    // Shuffle symbols
+    for (let i = symbols.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [symbols[i], symbols[j]] = [symbols[j], symbols[i]];
+    }
+    // Reassign
+    active.forEach((t, i) => t.symbol = symbols[i]);
+  }
+
   constructor(layoutType = 'classic') {
     this.tiles = [];
     this.layoutFn = LAYOUTS[layoutType] || LAYOUTS.classic;
@@ -366,6 +389,11 @@ class MahjongGame {
       e.stopPropagation();
       this.handleTileClick(tile);
     };
+    
+    if (tile.isMatched) {
+      el.style.display = 'none';
+    }
+
     return el;
   }
 
@@ -402,6 +430,11 @@ class MahjongGame {
           b.element.classList.remove('blocked-feedback');
           void b.element.offsetWidth; // trigger reflow
           b.element.classList.add('blocked-feedback');
+          
+          // Remove class after animation to ensure it can happen again
+          setTimeout(() => {
+            if(b.element) b.element.classList.remove('blocked-feedback');
+          }, 500);
         }
       });
       return;
@@ -456,6 +489,8 @@ class MahjongGame {
         
         if (this.board.tiles.every(t => t.isMatched)) {
           this.endGame(true);
+        } else if (!this.board.hasMoves()) {
+          this.shuffleBoard();
         }
       }, 500);
       
@@ -468,6 +503,34 @@ class MahjongGame {
         this.isProcessing = false;
       }, 800);
     }
+  }
+
+  shuffleBoard() {
+    // Popup notification
+    const pop = document.createElement('div');
+    pop.className = 'score-popup';
+    pop.innerHTML = "No Moves!<br>Shuffling... 🔀";
+    pop.style.top = '50%';
+    pop.style.left = '50%';
+    pop.style.transform = 'translate(-50%, -50%)';
+    pop.style.width = '300px';
+    pop.style.textAlign = 'center';
+    pop.style.zIndex = '200';
+    document.body.appendChild(pop);
+    setTimeout(() => pop.remove(), 1500);
+
+    // Shuffle until moves exist
+    let attempts = 0;
+    do {
+      this.board.shuffleActiveTiles();
+      attempts++;
+    } while (!this.board.hasMoves() && attempts < 15);
+
+    // Re-render
+    setTimeout(() => {
+      this.renderBoard();
+      // Reset rotation/scale to defaults? No, keep user view.
+    }, 500);
   }
 
   updateTileStates() {
